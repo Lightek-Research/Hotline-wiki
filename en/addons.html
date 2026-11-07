@@ -1,0 +1,71 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Addons · HOTLINE</title><link rel="stylesheet" href="../assets/style.css"><script src="../assets/theme.js"></script></head>
+<body><a class="skip" href="#main">Skip to content</a><header><button class="menu" aria-label="Menu" aria-expanded="false">☰</button><a class="brand" href="index.html"><span class="brand-icon">H</span>HOTLINE<span class="docs-label">Documentation</span></a><button class="search-open">⌕ <span>Search documentation</span><kbd>Ctrl K</kbd></button><nav class="header-actions"><a href="../ru/addons.html" lang="ru">RU</a><button class="theme" aria-label="Toggle theme / Сменить тему">◐</button></nav></header>
+<div class="layout"><aside class="sidebar"><div class="nav-label">GUIDE</div><nav><a href="index.html">HOTLINE</a><a href="getting-started.html" >Getting started</a><a href="interface-reference.html" >Buttons and interface reference</a><a href="configuration.html" >Configuration</a><a href="recording.html" >Recording cues</a><a href="timeline.html" >Timeline and Cue List</a><a href="shows.html" >Shows, saving, and playback</a><div class="nav-label api-nav-label">API &amp; ADDONS</div><a href="api-addons.html">API and automation</a><a class="nav-subpage" href="addons.html" aria-current="page">Addons</a><a class="nav-subpage" href="creating-addons.html">Creating addons</a><a href="security-performance.html" >Security and performance</a><a href="troubleshooting.html" >Troubleshooting</a><a href="contents.html" >Table of contents</a></nav><div class="sidebar-footer"><span class="status-dot"></span>LIGHTEK RESEARCH</div></aside><button class="scrim" aria-label="Close" hidden></button><main id="main"><div class="breadcrumb">HOTLINE <span>/</span> API and addons <span>/</span> Addons</div><article><h1>Addons</h1>
+<p>An addon connects HOTLINE to another system: it captures that system&#x27;s commands while recording and invokes its API during playback. GLights continues to work normally. One show can combine lighting, cameras, lyrics and lasers.</p>
+<p>This feature requires HOTLINE 0.14.0 or later. A native addon is a ModuleScript inside Addons. The external products themselves must be installed separately.</p>
+<h2 id="section-1">Installing a ready-made addon</h2>
+<ol><li>Stop Play.</li><li>Import the addon&#x27;s .rbxmx and move its ModuleScript into ServerScriptService → Hotline → Addons.</li><li>Install the external system and verify its API path.</li><li>Restart Play and check addon status.</li><li>Select/create a cue in Edit, start recording and operate the external system normally.</li></ol>
+<p>Install one copy per addon. A .luau file included in the archive is usually the same source for inspection, not an additional required module. Arbitrary StacyPilot addons are not automatically compatible; use a native HOTLINE port.</p>
+<h2 id="section-2">Available integrations</h2>
+<div class="tableWrapper"><table><thead><tr><th>Addon</th><th>Default API</th><th>Recorded commands</th></tr></thead><tbody><tr><td>Lyrics</td><td><code>ServerScriptService.LyricsController.Scripts.Api</code></td><td>LineChanged text, replayed through Chat(text).</td></tr><tr><td>Cameras</td><td><code>Workspace.CameraSystem.Api</code></td><td>Camera, focus, FOV, blur, saturation, tilt, bars, blackout, transition/speed and shake.</td></tr><tr><td>AtomLazers</td><td><code>Workspace.Atom(Lazers).Core(api)</code></td><td>ON/OFF, color, spinning and speed. Installed as a separate addon.</td></tr></tbody></table></div>
+<p>Lyrics and Cameras are ports of the supplied StacyPilot integrations. Their custom visual tracks are not reproduced: use HOTLINE&#x27;s standard Events/Cue List.</p>
+<p>PyroTemplate in the main package is a disabled template. It requires the actual pyrotechnics API; it is not a universal ready-made driver.</p>
+<h2 id="section-3">Paths and options</h2>
+<p>Add this inside the existing Config table. If AddonOptions already exists, merge the entries rather than creating a duplicate field.</p>
+<pre><code>AddonOptions = {
+    Lyrics = {
+        ApiPath = &quot;ServerScriptService.LyricsController.Scripts.Api&quot;,
+    },
+    Cameras = {
+        ApiPath = &quot;Workspace.CameraSystem.Api&quot;,
+        SnapshotOnRecord = false,
+    },
+    AtomLazers = {
+        ApiPath = &quot;Workspace.Atom(Lazers).Core(api)&quot;,
+        SnapshotOnRecord = false,
+    },
+},</code></pre>
+<p>Omit these fields to use default paths. If an addon implements Snapshot, SnapshotOnRecord=true records its initial state at the start of Timed. Capture does not take a snapshot: it waits for your command.</p>
+<p>Restart after changing paths or adding dependencies. An integration missing during initialization does not reconnect automatically later.</p>
+<h2 id="section-4">Timed and Capture</h2>
+<div class="tableWrapper"><table><thead><tr><th>Mode</th><th>Behavior</th></tr></thead><tbody><tr><td>Timed</td><td>Commands retain their offsets from the cue start. Pause finishes recording.</td></tr><tr><td>Capture</td><td>The first command is stored at offset zero, then recording finishes automatically.</td></tr></tbody></table></div>
+<p>If one panel action emits several signals, Capture saves the first. It does not batch every parameter into a snapshot. Use Timed for a sequence.</p>
+<p>Open the cue&#x27;s Events. Addon targets begin with @: @Lyrics, @Cameras, @AtomLazers. Reserve this prefix rather than using it in GLights group names. Playback must not record its own commands again. A show with addon events requires the working integration; otherwise loading is rejected.</p>
+<h2 id="section-5">Example: AtomLazers</h2>
+<p>Keep the original Atom(Lazers) system in Workspace with Core(api) and Lazers. Put the new AtomLazers ModuleScript into Hotline.Addons. No original Core replacement is required.</p>
+<p>This laser API has no signals, so the addon wraps methods on its server API table. After addon readiness, use DOT calls from ordinary server Scripts:</p>
+<pre><code>local Laser = require(workspace[&quot;Atom(Lazers)&quot;][&quot;Core(api)&quot;])
+
+Laser.ON()
+Laser.CHANGECOLOR(Color3.fromRGB(255, 0, 0))
+Laser.CHANGE_SPIN_SPEED(0.05)
+Laser.SPIN_ON()
+-- At the desired time:
+Laser.SPIN_OFF()
+Laser.OFF()</code></pre>
+<p>This is a list of calls, not a timed sequence: without waits they run immediately one after another. Record using your own panel/timed Script or the LaserTest supplied with the addon.</p>
+<p>Color is Color3. Speed is a finite non-negative number in the original API&#x27;s units. ON/OFF/SPIN_ON/SPIN_OFF take no arguments. OFF only disables beams. The original CHANGE_SPIN_SPEED immediately updates motor MaxVelocity; call SPIN_OFF afterward to ensure spinning is stopped.</p>
+<p>A function reference cached before initialization, such as local on = Laser.ON, can bypass the wrapper. Call Laser.ON() through the API table. Client calls and direct Beam/Motor changes are not captured.</p>
+<h2 id="section-6">Reset and seeking</h2>
+<p>Each integration defines Reset. Lyrics clears text. Cameras clears focus, blackout and bars but retains the selected camera, because the supplied contract does not specify a reliable return-to-gameplay method. AtomLazers disables beams and spinning.</p>
+<p>Seeking restores only commands whose developer enables ReplayOnSeek. This suits color and state. One-shot effects are skipped by default while restoring position. See <a href="creating-addons.html">Creating addons</a>.</p>
+<h2 id="addon-status">Checking status</h2>
+<p>Run from an ordinary server Script:</p>
+<pre><code>local Api = require(game.ServerScriptService.Hotline.Scripts.Api)
+assert(Api.WaitForReady(20), &quot;HOTLINE is not ready&quot;)
+
+local addons, err = Api.GetAddons()
+if addons then
+    for name, info in pairs(addons) do
+        print(name, info.state, info.error)
+    end
+else
+    warn(err)
+end</code></pre>
+<p>WaitForReady waits for HOTLINE, not every integration. During startup an addon may still be loading; check again later or subscribe to Events.AddonsChanged.</p>
+<div class="tableWrapper"><table><thead><tr><th>Status</th><th>Meaning</th></tr></thead><tbody><tr><td>loading</td><td>Initialization is in progress.</td></tr><tr><td>ready</td><td>Registered and available.</td></tr><tr><td>missing</td><td>External API not found; check path/dependency.</td></tr><tr><td>disabled</td><td>Returned specification has Enabled=false.</td></tr><tr><td>failed</td><td>Invalid specification, connection error or registration timeout; inspect Output.</td></tr></tbody></table></div>
+<p>Disable an addon with Enabled=false in its returned table and restart Play. A ModuleScript Enabled=false attribute also skips loading; such a module may be absent from the status list.</p>
+<p>If no events appear, check addon readiness, Edit mode, selected cue, active recording, server execution and correct API calls. Report reproduction steps, Output and GetAddons to <a href="https://t.me/hoomlion">Telegram @hoomlion</a> or Discord hoomlion.</p>
+<h2 id="section-8">Your own integration</h2>
+<p>Start with <a href="creating-addons.html">Creating addons</a>: a working teaching system, complete addon and a recording test from the first call to HOTLINE Events.</p></article><nav class="pager"><a href="api-addons.html"><small>Previous</small>API and automation</a><a href="creating-addons.html"><small>Next</small>Creating addons<span aria-hidden="true">→</span></a></nav><footer>HOTLINE · LIGHTEK RESEARCH <a href="https://t.me/hoomlion">@hoomlion ↗</a></footer></main><aside class="toc"><div class="nav-label">On this page</div><a class="h2" href="#section-1">Installing a ready-made addon</a><a class="h2" href="#section-2">Available integrations</a><a class="h2" href="#section-3">Paths and options</a><a class="h2" href="#section-4">Timed and Capture</a><a class="h2" href="#section-5">Example: AtomLazers</a><a class="h2" href="#section-6">Reset and seeking</a><a class="h2" href="#addon-status">Checking status</a><a class="h2" href="#section-8">Your own integration</a></aside></div>
+<dialog class="search-dialog"><div class="search-heading"><label for="query">Search documentation</label><button class="close-search" aria-label="Close">×</button></div><input id="query" type="search" placeholder="Search documentation…" autocomplete="off"><div class="results"></div></dialog><dialog class="image-dialog"><button class="close-image" aria-label="Close">×</button><img alt=""><a target="_blank" rel="noopener">Open image at full size ↗</a></dialog><script>window.WIKI_LANG="en";window.WIKI_NO_RESULTS="No results";</script><script src="../assets/search-data.js"></script><script src="../assets/app.js"></script></body></html>

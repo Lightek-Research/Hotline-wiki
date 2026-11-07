@@ -1,0 +1,91 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>API и автоматизация · HOTLINE</title><link rel="stylesheet" href="../assets/style.css"><script src="../assets/theme.js"></script></head>
+<body><a class="skip" href="#main">Skip to content</a><header><button class="menu" aria-label="Меню" aria-expanded="false">☰</button><a class="brand" href="index.html"><span class="brand-icon">H</span>HOTLINE<span class="docs-label">Документация</span></a><button class="search-open">⌕ <span>Поиск по документации</span><kbd>Ctrl K</kbd></button><nav class="header-actions"><a href="../en/api-addons.html" lang="en">EN</a><button class="theme" aria-label="Toggle theme / Сменить тему">◐</button></nav></header>
+<div class="layout"><aside class="sidebar"><div class="nav-label">GUIDE</div><nav><a href="index.html">HOTLINE</a><a href="getting-started.html" >Начало работы</a><a href="interface-reference.html" >Кнопки и элементы интерфейса</a><a href="configuration.html" >Настройки</a><a href="recording.html" >Запись кью</a><a href="timeline.html" >Таймлайн и Cue List</a><a href="shows.html" >Шоу, сохранение и воспроизведение</a><div class="nav-label api-nav-label">API &amp; ADDONS</div><a href="api-addons.html" aria-current="page">API и автоматизация</a><a class="nav-subpage" href="addons.html">Аддоны</a><a class="nav-subpage" href="creating-addons.html">Создание аддонов</a><a href="security-performance.html" >Безопасность и производительность</a><a href="troubleshooting.html" >Решение проблем</a><a href="contents.html" >Содержание</a></nav><div class="sidebar-footer"><span class="status-dot"></span>LIGHTEK RESEARCH</div></aside><button class="scrim" aria-label="Закрыть" hidden></button><main id="main"><div class="breadcrumb">HOTLINE <span>/</span> API и аддоны <span>/</span> API и автоматизация</div><article><h1>API и автоматизация</h1>
+<p>API позволяет другому серверному Script загрузить сохранённое шоу HOTLINE, запустить музыку, поставить воспроизведение на паузу и получить состояние. Открытый GUI оператора не обязателен. Поддержка API и аддонов появилась в HOTLINE 0.14.0.</p>
+<p>Для подключения других систем откройте <a href="addons.html">Установка и использование аддонов</a>. Чтобы написать свою интеграцию — <a href="creating-addons.html">Создание аддонов</a>.</p>
+<h2 id="section-1">Первый запуск за несколько минут</h2>
+<ol><li>Установите HOTLINE в ServerScriptService и настройте Config. Рабочий путь модуля: ServerScriptService → Hotline → Scripts → Api.</li><li>В режиме Edit создайте небольшое шоу, добавьте команды в первые секунды и сохраните под уникальным именем API Test.</li><li>Создайте обычный Script в ServerScriptService. Используйте серверный RunContext, не LocalScript.</li><li>Вставьте код ниже и запустите Play.</li></ol>
+<pre><code>local SSS = game:GetService(&quot;ServerScriptService&quot;)
+local Hotline = SSS:WaitForChild(&quot;Hotline&quot;, 10)
+assert(Hotline, &quot;Hotline folder not found&quot;)
+local Api = require(Hotline:WaitForChild(&quot;Scripts&quot;):WaitForChild(&quot;Api&quot;))
+assert(Api.WaitForReady(20), &quot;HOTLINE is not ready&quot;)
+
+local ok, result = Api.PlayShow(&quot;API Test&quot;, {
+    UseConfiguredSound = false,
+    Duration = 10,
+})
+if not ok then
+    warn(&quot;HOTLINE: &quot; .. tostring(result))
+end</code></pre>
+<p>Шоу должно запуститься, а через 10 секунд времени шоу — остановиться. Duration в этом примере задан специально для проверки. При другой скорости шоу меняется реальное время до остановки. Если GUI открыт, оператор получит это шоу в Load.</p>
+<p>Этот пример выполняется при каждом запуске теста. После проверки отключите тестовый Script, чтобы шоу не стартовало автоматически.</p>
+<h2 id="section-2">Запуск теста из Command Bar</h2>
+<p>Удобно хранить тестовый код в выключенном обычном Script HotlineTest внутри ServerStorage. Сам Script в ServerStorage не выполняется. Во время Play переключите Studio на Server и запустите его копию:</p>
+<pre><code>local test = game.ServerStorage.HotlineTest:Clone()
+test.Enabled = false
+test.Parent = game.ServerScriptService
+test.Enabled = true</code></pre>
+<p>Так команды API выполняются из серверного Script. Не вставляйте весь тестовый код API напрямую в Command Bar: используйте её для запуска подготовленного Script, как выше.</p>
+<p>В клиентском Explorer содержимое ServerStorage и ServerScriptService недоступно. Это не означает, что скрипты удалились. Если вы видите NetworkClient и пустые серверные папки, переключитесь на Server.</p>
+<h2 id="section-3">Как выбрать шоу</h2>
+<p>PlayShow работает с уже сохранённым световым шоу, а не с произвольным audio ID. Можно передать имя или ID слота:</p>
+<pre><code>local ok, result = Api.PlayShow(&quot;Opening&quot;)
+-- Или точный ID сохранения:
+local okBySlot, resultBySlot = Api.PlayShow({Slot = &quot;show_your_slot&quot;})</code></pre>
+<p>Выполняйте только нужный вариант: каждый PlayShow запрашивает загрузку и запуск. Имя должно совпадать точно и быть уникальным. Для частых запусков лучше ID слота: он не требует поиска по именам всех сохранений. Одинаковые имена вызывают ошибку. Строка, совпавшая с существующим ID слота, выбирает этот слот.</p>
+<p>Узнать ID можно через список сохранений. Этот пример использует Api, подключённый как в первом блоке:</p>
+<pre><code>local page, err = Api.ListShows(true)
+while page do
+    for _, show in ipairs(page.shows) do
+        print(show.slot, show.name)
+    end
+    if not page.more then break end
+    page, err = Api.ListShows(false)
+end
+if err then warn(err) end</code></pre>
+<p>У API свой курсор страниц: он не перелистывает список в GUI. Поиск по имени ограничен 200 страницами по 50 ключей. Во время записи загрузка другого шоу запрещена. Параллельные операции отклоняются, а не копятся в очереди. Не вызывайте PlayShow каждый кадр.</p>
+<h2 id="section-4">Play, Pause, Stop и ожидание</h2>
+<p>Все примеры ниже предполагают уже подключённый Api. Вызывайте нужную команду из своего серверного события, а не все подряд.</p>
+<div class="tableWrapper"><table><thead><tr><th>Вызов</th><th>Что происходит</th></tr></thead><tbody><tr><td><code>Api.PlayShow(&quot;Opening&quot;)</code></td><td>Загружает сохранённое шоу и запускает его.</td></tr><tr><td><code>Api.ArmShow(&quot;Opening&quot;)</code></td><td>Загружает шоу в Load без немедленного исполнения сохранённых команд.</td></tr><tr><td><code>Api.Play()</code></td><td>Запускает или продолжает текущее шоу.</td></tr><tr><td><code>Api.Pause()</code></td><td>Ставит текущее воспроизведение на паузу.</td></tr><tr><td><code>Api.Stop()</code></td><td>Останавливает и сбрасывает позицию.</td></tr><tr><td><code>Api.GetState()</code></td><td>Возвращает состояние текущего шоу.</td></tr><tr><td><code>Api.GetAddons()</code></td><td>Возвращает состояния аддонов.</td></tr></tbody></table></div>
+<p>ArmShow удобно использовать вместе с привязанным Workspace Sound: HOTLINE ждёт, когда тот начнёт играть. Если Sound уже играет, синхронизация начнётся на следующем кадре. Чтобы ждать будущий запуск, Sound должен быть остановлен. Без привязанного Sound после ArmShow нужен Api.Play().</p>
+<h2 id="section-5">Музыка и параметры запуска</h2>
+<pre><code>local ok, result = Api.PlayShow({Slot = &quot;show_your_slot&quot;}, {
+    RequireIdle = true,
+    UseConfiguredSound = true,
+    Duration = 52,
+})
+if not ok then warn(result) end</code></pre>
+<div class="tableWrapper"><table><thead><tr><th>Параметр</th><th>Значение</th></tr></thead><tbody><tr><td><code>RequireIdle</code></td><td>При true отказывается от запуска, если шоу уже играет. По умолчанию false.</td></tr><tr><td><code>UseConfiguredSound</code></td><td>По умолчанию true: использует валидный Workspace Sound из Config.ShowSoundTriggers. При false выбирает сохранённую музыку шоу.</td></tr><tr><td><code>Duration</code></td><td>Необязательная положительная длительность для внутреннего времени шоу. Подходит и для шоу без музыки. Для привязанного Workspace Sound не используется.</td></tr></tbody></table></div>
+<p>Источники музыки: привязанный Sound по слоту или имени шоу → audio ID в сохранённом шоу → тишина. <a href="configuration.html">Настройка ShowSoundTriggers и GlobalAudio</a>.</p>
+<p>PlayShow сам запускает/продолжает привязанный Sound. ArmShow только подготавливает синхронизацию. Встроенная музыка без оператора доступна присутствующим игрокам при GlobalAudio=true. При false сохраняется личное аудио оператора. У Workspace Sound своя громкость.</p>
+<p>Если Duration не задан, сервер пытается получить длину внутреннего трека. Когда длину определить не удалось, для надёжного автостопа задайте Duration. У шоу без музыки и без Duration нет музыкального дедлайна остановки.</p>
+<h2 id="section-6">Результаты, состояние и события</h2>
+<p>PlayShow, ArmShow, Play, Pause и Stop возвращают пару ok, resultOrError. Всегда проверяйте ok. GetState, GetAddons и ListShows возвращают данные либо nil, error.</p>
+<pre><code>local state, err = Api.GetState()
+if state then
+    print(state.name, state.slot, state.position, state.playing)
+else
+    warn(err)
+end</code></pre>
+<p>В состоянии также есть recording, recordMode, readOnly, external, automated, speed, soundId и другие поля транспорта. WaitForReady(timeout) ждёт готовности серверного API: по умолчанию 10 секунд, допустимо от 0 до 60. Готовность всех аддонов проверяется отдельно.</p>
+<pre><code>Api.Events.ShowLoaded:Connect(function(state)
+    print(&quot;Loaded:&quot;, state.name)
+end)
+Api.Events.PlaybackStarted:Connect(function(state)
+    print(&quot;Started:&quot;, state.slot)
+end)
+Api.Events.PlaybackStopped:Connect(function(event)
+    print(&quot;Stopped:&quot;, event.reason, event.state.position)
+end)
+Api.Events.Error:Connect(function(event)
+    warn(event.operation, event.error)
+end)</code></pre>
+<div class="tableWrapper"><table><thead><tr><th>Сигнал</th><th>Данные</th></tr></thead><tbody><tr><td><code>Ready</code></td><td>Готовность API; если подключились позднее, используйте WaitForReady.</td></tr><tr><td><code>ShowLoaded</code>, <code>PlaybackStarted</code>, <code>StateChanged</code></td><td>Состояние шоу. StateChanged сообщает переходы состояния/режима, а не каждый тик позиции.</td></tr><tr><td><code>PlaybackPaused</code>, <code>PlaybackStopped</code></td><td>Таблица с reason и state.</td></tr><tr><td><code>Error</code></td><td>Таблица с operation и error.</td></tr><tr><td><code>AddonsChanged</code></td><td>Таблица состояний аддонов.</td></tr></tbody></table></div>
+<p>Есть команды через BindableEvent: Api.Signals.PlayShow, ArmShow, Play, Pause, Stop. Например:</p>
+<pre><code>Api.Signals.PlayShow:Fire(&quot;Opening&quot;)</code></pre>
+<p>У сигналов нет возвращаемого результата. Ошибки смотрите в Events.Error и Output. Чтобы получить ok напрямую, используйте обычный метод.</p>
+<h2 id="section-7">Доступ и частые ошибки</h2>
+<p>API доступен доверенному серверному коду. GUI whitelist остаётся на месте. Если делаете собственную кнопку игрока или RemoteEvent, проверяйте права на сервере перед вызовом API. Не передавайте клиенту право запускать произвольные шоу без проверки.</p>
+<div class="tableWrapper"><table><thead><tr><th>Симптом</th><th>Что проверить</th></tr></thead><tbody><tr><td><code>Hotline is not a valid member</code> и пометка Client</td><td>Запуск на клиенте. Используйте обычный серверный Script и серверный контекст Studio.</td></tr><tr><td><code>Infinite yield</code> на Hotline</td><td>Имя и расположение папки; клиент не видит её содержимое. В примере ожидание ограничено 10 секундами.</td></tr><tr><td><code>HOTLINE is not ready</code></td><td>Основной Hotline.Scripts.Server должен работать. Смотрите первые ошибки после старта Play, наличие GLights и Config. Проверяйте из обычного серверного Script.</td></tr><tr><td><code>Saved show not found</code></td><td>Шоу должно быть сохранено в том же плейсе/хранилище. Проверьте точное имя или Slot.</td></tr><tr><td>Несколько шоу с одним именем</td><td>Используйте Slot.</td></tr><tr><td><code>Required addon unavailable</code></td><td>Откройте GetAddons и <a href="addons.html#addon-status">диагностику аддонов</a>.</td></tr><tr><td>Музыку не слышно или нет автостопа</td><td>Проверьте источник, доступность audio asset, GlobalAudio и Duration.</td></tr></tbody></table></div></article><nav class="pager"><a href="shows.html"><small>Назад</small>Шоу</a><a href="addons.html"><small>Далее</small>Аддоны<span aria-hidden="true">→</span></a></nav><footer>HOTLINE · LIGHTEK RESEARCH <a href="https://t.me/hoomlion">@hoomlion ↗</a></footer></main><aside class="toc"><div class="nav-label">На этой странице</div><a class="h2" href="#section-1">Первый запуск за несколько минут</a><a class="h2" href="#section-2">Запуск теста из Command Bar</a><a class="h2" href="#section-3">Как выбрать шоу</a><a class="h2" href="#section-4">Play, Pause, Stop и ожидание</a><a class="h2" href="#section-5">Музыка и параметры запуска</a><a class="h2" href="#section-6">Результаты, состояние и события</a><a class="h2" href="#section-7">Доступ и частые ошибки</a></aside></div>
+<dialog class="search-dialog"><div class="search-heading"><label for="query">Поиск по документации</label><button class="close-search" aria-label="Закрыть">×</button></div><input id="query" type="search" placeholder="Поиск по документации…" autocomplete="off"><div class="results"></div></dialog><dialog class="image-dialog"><button class="close-image" aria-label="Закрыть">×</button><img alt=""><a target="_blank" rel="noopener">Открыть изображение в полном размере ↗</a></dialog><script>window.WIKI_LANG="ru";window.WIKI_NO_RESULTS="\u041d\u0438\u0447\u0435\u0433\u043e \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u043e";</script><script src="../assets/search-data.js"></script><script src="../assets/app.js"></script></body></html>

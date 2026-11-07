@@ -1,0 +1,91 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>API and automation · HOTLINE</title><link rel="stylesheet" href="../assets/style.css"><script src="../assets/theme.js"></script></head>
+<body><a class="skip" href="#main">Skip to content</a><header><button class="menu" aria-label="Menu" aria-expanded="false">☰</button><a class="brand" href="index.html"><span class="brand-icon">H</span>HOTLINE<span class="docs-label">Documentation</span></a><button class="search-open">⌕ <span>Search documentation</span><kbd>Ctrl K</kbd></button><nav class="header-actions"><a href="../ru/api-addons.html" lang="ru">RU</a><button class="theme" aria-label="Toggle theme / Сменить тему">◐</button></nav></header>
+<div class="layout"><aside class="sidebar"><div class="nav-label">GUIDE</div><nav><a href="index.html">HOTLINE</a><a href="getting-started.html" >Getting started</a><a href="interface-reference.html" >Buttons and interface reference</a><a href="configuration.html" >Configuration</a><a href="recording.html" >Recording cues</a><a href="timeline.html" >Timeline and Cue List</a><a href="shows.html" >Shows, saving, and playback</a><div class="nav-label api-nav-label">API &amp; ADDONS</div><a href="api-addons.html" aria-current="page">API and automation</a><a class="nav-subpage" href="addons.html">Addons</a><a class="nav-subpage" href="creating-addons.html">Creating addons</a><a href="security-performance.html" >Security and performance</a><a href="troubleshooting.html" >Troubleshooting</a><a href="contents.html" >Table of contents</a></nav><div class="sidebar-footer"><span class="status-dot"></span>LIGHTEK RESEARCH</div></aside><button class="scrim" aria-label="Close" hidden></button><main id="main"><div class="breadcrumb">HOTLINE <span>/</span> API and addons <span>/</span> API and automation</div><article><h1>API and automation</h1>
+<p>The server API lets another Script load a saved HOTLINE show, start its audio, pause playback and inspect state. An open operator GUI is not required. API and addon support were introduced in HOTLINE 0.14.0.</p>
+<p>To connect other systems, see <a href="addons.html">Installing and using addons</a>. To build an integration, see <a href="creating-addons.html">Creating addons</a>.</p>
+<h2 id="section-1">Your first automated launch</h2>
+<ol><li>Install HOTLINE in ServerScriptService and configure Config. The API module is ServerScriptService → Hotline → Scripts → Api.</li><li>In Edit mode, create a short show, put commands in its first seconds and save it under the unique name API Test.</li><li>Create an ordinary server Script in ServerScriptService. Use the server RunContext, not a LocalScript.</li><li>Paste the following and start Play.</li></ol>
+<pre><code>local SSS = game:GetService(&quot;ServerScriptService&quot;)
+local Hotline = SSS:WaitForChild(&quot;Hotline&quot;, 10)
+assert(Hotline, &quot;Hotline folder not found&quot;)
+local Api = require(Hotline:WaitForChild(&quot;Scripts&quot;):WaitForChild(&quot;Api&quot;))
+assert(Api.WaitForReady(20), &quot;HOTLINE is not ready&quot;)
+
+local ok, result = Api.PlayShow(&quot;API Test&quot;, {
+    UseConfiguredSound = false,
+    Duration = 10,
+})
+if not ok then
+    warn(&quot;HOTLINE: &quot; .. tostring(result))
+end</code></pre>
+<p>The show should start and stop after 10 seconds on the show clock. Duration is set explicitly for this test. A different show speed changes the real elapsed time before the deadline. If the operator GUI is open, it receives the show in Load mode.</p>
+<p>This Script runs every time the test starts. Disable it after testing if you do not want automatic playback on startup.</p>
+<h2 id="section-2">Starting a test from Command Bar</h2>
+<p>Store the test code in a disabled ordinary Script named HotlineTest in ServerStorage. A Script does not execute while stored there. During Play, switch Studio to Server and launch a copy:</p>
+<pre><code>local test = game.ServerStorage.HotlineTest:Clone()
+test.Enabled = false
+test.Parent = game.ServerScriptService
+test.Enabled = true</code></pre>
+<p>This runs API calls from a server Script. Use Command Bar to launch the prepared Script rather than pasting the full API test directly into Command Bar.</p>
+<p>The client Explorer cannot see the contents of ServerStorage or ServerScriptService. Those scripts have not been deleted. If you see NetworkClient and empty server folders, switch to Server.</p>
+<h2 id="section-3">Selecting a saved show</h2>
+<p>PlayShow selects a saved lighting show, not an arbitrary audio ID. Pass a name or a saved slot:</p>
+<pre><code>local ok, result = Api.PlayShow(&quot;Opening&quot;)
+-- Alternative: an exact save slot.
+local okBySlot, resultBySlot = Api.PlayShow({Slot = &quot;show_your_slot&quot;})</code></pre>
+<p>Run only the variant you need: each call requests a new load/start. Names must match exactly and be unique. Prefer slots for repeated automation because they avoid scanning saved names. Duplicate names are rejected. A string matching an existing slot selects that slot first.</p>
+<p>List slots using the Api variable initialized above:</p>
+<pre><code>local page, err = Api.ListShows(true)
+while page do
+    for _, show in ipairs(page.shows) do
+        print(show.slot, show.name)
+    end
+    if not page.more then break end
+    page, err = Api.ListShows(false)
+end
+if err then warn(err) end</code></pre>
+<p>The API has a separate page cursor from the GUI. Name search is capped at 200 pages of 50 keys. Loading another show is blocked while recording. Concurrent operations are rejected rather than queued. Do not call PlayShow every frame.</p>
+<h2 id="section-4">Transport and arming</h2>
+<p>The following calls assume an initialized Api. Invoke the command you need from your server event; these are not a sequence to run all at once.</p>
+<div class="tableWrapper"><table><thead><tr><th>Call</th><th>Behavior</th></tr></thead><tbody><tr><td><code>Api.PlayShow(&quot;Opening&quot;)</code></td><td>Load a saved show and start it.</td></tr><tr><td><code>Api.ArmShow(&quot;Opening&quot;)</code></td><td>Load in Load mode without immediately executing saved commands.</td></tr><tr><td><code>Api.Play()</code></td><td>Start or resume the current show.</td></tr><tr><td><code>Api.Pause()</code></td><td>Pause current playback.</td></tr><tr><td><code>Api.Stop()</code></td><td>Stop and reset the position.</td></tr><tr><td><code>Api.GetState()</code></td><td>Read current show state.</td></tr><tr><td><code>Api.GetAddons()</code></td><td>Read addon registration states.</td></tr></tbody></table></div>
+<p>ArmShow can wait for a linked Workspace Sound to begin playing. If the Sound is already playing, synchronization begins on the next frame; stop it first to await a future trigger. Without a linked Sound, call Api.Play() after ArmShow.</p>
+<h2 id="section-5">Audio and launch options</h2>
+<pre><code>local ok, result = Api.PlayShow({Slot = &quot;show_your_slot&quot;}, {
+    RequireIdle = true,
+    UseConfiguredSound = true,
+    Duration = 52,
+})
+if not ok then warn(result) end</code></pre>
+<div class="tableWrapper"><table><thead><tr><th>Option</th><th>Meaning</th></tr></thead><tbody><tr><td><code>RequireIdle</code></td><td>True rejects a launch while a show is playing. Default false.</td></tr><tr><td><code>UseConfiguredSound</code></td><td>Default true: use a valid Workspace Sound mapped by Config.ShowSoundTriggers. False selects the saved show&#x27;s internal audio.</td></tr><tr><td><code>Duration</code></td><td>Optional positive duration for the internal show clock, including silent shows. Not used with a linked Workspace Sound.</td></tr></tbody></table></div>
+<p>Audio priority: linked Sound by slot/name → saved audio ID → silence. See <a href="configuration.html">ShowSoundTriggers and GlobalAudio settings</a>.</p>
+<p>PlayShow actively plays/resumes the linked Sound. ArmShow only prepares synchronization. Unattended internal audio is heard by players when GlobalAudio=true. False retains operator-only audio. Workspace Sound volume is controlled on that Sound.</p>
+<p>Without Duration, the server attempts to determine internal track length. If this fails, provide Duration for reliable auto-stop. A silent show with no Duration has no audio-based stopping deadline.</p>
+<h2 id="section-6">Results, state and events</h2>
+<p>PlayShow, ArmShow, Play, Pause and Stop return ok, resultOrError. Always check ok. GetState, GetAddons and ListShows return data or nil, error.</p>
+<pre><code>local state, err = Api.GetState()
+if state then
+    print(state.name, state.slot, state.position, state.playing)
+else
+    warn(err)
+end</code></pre>
+<p>State also includes recording, recordMode, readOnly, external, automated, speed, soundId and transport fields. WaitForReady(timeout) waits for the server API, default 10 seconds, allowed range 0–60. Addon readiness is checked separately.</p>
+<pre><code>Api.Events.ShowLoaded:Connect(function(state)
+    print(&quot;Loaded:&quot;, state.name)
+end)
+Api.Events.PlaybackStarted:Connect(function(state)
+    print(&quot;Started:&quot;, state.slot)
+end)
+Api.Events.PlaybackStopped:Connect(function(event)
+    print(&quot;Stopped:&quot;, event.reason, event.state.position)
+end)
+Api.Events.Error:Connect(function(event)
+    warn(event.operation, event.error)
+end)</code></pre>
+<div class="tableWrapper"><table><thead><tr><th>Signal</th><th>Payload</th></tr></thead><tbody><tr><td><code>Ready</code></td><td>API initialization. If subscribing later, use WaitForReady instead.</td></tr><tr><td><code>ShowLoaded</code>, <code>PlaybackStarted</code>, <code>StateChanged</code></td><td>Show state. StateChanged reports state/mode transitions, not continuous position ticks.</td></tr><tr><td><code>PlaybackPaused</code>, <code>PlaybackStopped</code></td><td>Table with reason and state.</td></tr><tr><td><code>Error</code></td><td>Table with operation and error.</td></tr><tr><td><code>AddonsChanged</code></td><td>Addon status table.</td></tr></tbody></table></div>
+<p>BindableEvent commands are available as Api.Signals.PlayShow, ArmShow, Play, Pause and Stop:</p>
+<pre><code>Api.Signals.PlayShow:Fire(&quot;Opening&quot;)</code></pre>
+<p>Signals have no return value. Observe Events.Error and Output for failures. Use a normal method when you need ok directly.</p>
+<h2 id="section-7">Access and troubleshooting</h2>
+<p>The API trusts server code. The existing GUI whitelist remains active. If you expose a player button or RemoteEvent, check permissions on the server before calling the API. Do not grant arbitrary client-selected show execution without validation.</p>
+<div class="tableWrapper"><table><thead><tr><th>Symptom</th><th>Check</th></tr></thead><tbody><tr><td><code>Hotline is not a valid member</code> with Client in Output</td><td>Client execution. Use an ordinary server Script and Studio&#x27;s Server context.</td></tr><tr><td><code>Infinite yield</code> waiting for Hotline</td><td>Folder name/location and execution context. The first example limits this wait to 10 seconds.</td></tr><tr><td><code>HOTLINE is not ready</code></td><td>Hotline.Scripts.Server must initialize. Inspect the first errors after Play starts, GLights and Config. Test from an ordinary server Script.</td></tr><tr><td><code>Saved show not found</code></td><td>Save in the same experience/store; check the exact name or Slot.</td></tr><tr><td>Duplicate show names</td><td>Use Slot.</td></tr><tr><td><code>Required addon unavailable</code></td><td>Inspect GetAddons and <a href="addons.html#addon-status">addon diagnostics</a>.</td></tr><tr><td>Missing audio or auto-stop</td><td>Check source, audio permissions, GlobalAudio and Duration.</td></tr></tbody></table></div></article><nav class="pager"><a href="shows.html"><small>Previous</small>Shows</a><a href="addons.html"><small>Next</small>Addons<span aria-hidden="true">→</span></a></nav><footer>HOTLINE · LIGHTEK RESEARCH <a href="https://t.me/hoomlion">@hoomlion ↗</a></footer></main><aside class="toc"><div class="nav-label">On this page</div><a class="h2" href="#section-1">Your first automated launch</a><a class="h2" href="#section-2">Starting a test from Command Bar</a><a class="h2" href="#section-3">Selecting a saved show</a><a class="h2" href="#section-4">Transport and arming</a><a class="h2" href="#section-5">Audio and launch options</a><a class="h2" href="#section-6">Results, state and events</a><a class="h2" href="#section-7">Access and troubleshooting</a></aside></div>
+<dialog class="search-dialog"><div class="search-heading"><label for="query">Search documentation</label><button class="close-search" aria-label="Close">×</button></div><input id="query" type="search" placeholder="Search documentation…" autocomplete="off"><div class="results"></div></dialog><dialog class="image-dialog"><button class="close-image" aria-label="Close">×</button><img alt=""><a target="_blank" rel="noopener">Open image at full size ↗</a></dialog><script>window.WIKI_LANG="en";window.WIKI_NO_RESULTS="No results";</script><script src="../assets/search-data.js"></script><script src="../assets/app.js"></script></body></html>
