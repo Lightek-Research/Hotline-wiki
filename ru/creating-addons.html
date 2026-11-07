@@ -1,160 +1,165 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Создание аддонов · HOTLINE</title><link rel="stylesheet" href="../assets/style.css"><script src="../assets/theme.js"></script></head>
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Создание аддонов: пример с пиро · HOTLINE</title><link rel="stylesheet" href="../assets/style.css"><script src="../assets/theme.js"></script></head>
 <body><a class="skip" href="#main">Skip to content</a><header><button class="menu" aria-label="Меню" aria-expanded="false">☰</button><a class="brand" href="index.html"><span class="brand-icon">H</span>HOTLINE<span class="docs-label">Документация</span></a><button class="search-open">⌕ <span>Поиск по документации</span><kbd>Ctrl K</kbd></button><nav class="header-actions"><a href="../en/creating-addons.html" lang="en">EN</a><button class="theme" aria-label="Toggle theme / Сменить тему">◐</button></nav></header>
-<div class="layout"><aside class="sidebar"><div class="nav-label">GUIDE</div><nav><a href="index.html">HOTLINE</a><a href="getting-started.html" >Начало работы</a><a href="interface-reference.html" >Кнопки и элементы интерфейса</a><a href="configuration.html" >Настройки</a><a href="recording.html" >Запись кью</a><a href="timeline.html" >Таймлайн и Cue List</a><a href="shows.html" >Шоу, сохранение и воспроизведение</a><div class="nav-label api-nav-label">API &amp; ADDONS</div><a href="api-addons.html">API и автоматизация</a><a class="nav-subpage" href="addons.html">Аддоны</a><a class="nav-subpage" href="creating-addons.html" aria-current="page">Создание аддонов</a><a href="security-performance.html" >Безопасность и производительность</a><a href="troubleshooting.html" >Решение проблем</a><a href="contents.html" >Содержание</a></nav><div class="sidebar-footer"><span class="status-dot"></span>LIGHTEK RESEARCH</div></aside><button class="scrim" aria-label="Закрыть" hidden></button><main id="main"><div class="breadcrumb">HOTLINE <span>/</span> API и аддоны <span>/</span> Создание аддонов</div><article><h1>Создание аддонов</h1><p><a href="../assets/examples/HOTLINE_Example_Addon.zip" download>Скачать все три файла учебного примера</a>. В архиве указано, куда положить каждый модуль; тестовый Script выключен.</p>
-<p>В этом руководстве мы сделаем простую серверную систему с состоянием «включено/выключено», подключим её к HOTLINE и запишем команды. Это учебный пример: реальная интеграция использует API вашей камеры, пиротехники, экранов или другой системы.</p>
-<p>Перед началом установите HOTLINE 0.14.0 и проверьте обычную запись GLights. Для использования готовых интеграций достаточно <a href="addons.html">страницы аддонов</a>.</p>
-<h2 id="section-1">Как устроена связь</h2>
-<p>Внешняя система сообщает об изменении → Connect передаёт команду через emit → HOTLINE сохраняет её в кью. При воспроизведении HOTLINE проверяет аргументы через Validate и вызывает Run. Reset отвечает за сброс состояния.</p>
-<p>Аддон не заменяет API вашей системы и не должен заново создавать таймлайн. Достаточно описать фиксированный набор команд и подключить уведомления о действиях.</p>
-<h2 id="section-2">Шаг 1. Учебная система</h2>
-<p>Создайте ModuleScript ExampleSystem непосредственно в ServerScriptService и вставьте:</p>
-<pre><code>local changed = Instance.new(&quot;BindableEvent&quot;)
-changed.Name = &quot;Changed&quot;
-changed.Parent = script
+<div class="layout"><aside class="sidebar"><div class="nav-label">GUIDE</div><nav><a href="index.html">HOTLINE</a><a href="getting-started.html" >Начало работы</a><a href="interface-reference.html" >Кнопки и элементы интерфейса</a><a href="configuration.html" >Настройки</a><a href="recording.html" >Запись кью</a><a href="timeline.html" >Таймлайн и Cue List</a><a href="shows.html" >Шоу, сохранение и воспроизведение</a><div class="nav-label api-nav-label">API &amp; ADDONS</div><a href="api-addons.html">API и автоматизация</a><a class="nav-subpage" href="addons.html">Аддоны</a><a class="nav-subpage" href="creating-addons.html" aria-current="page">Создание аддонов</a><a href="security-performance.html" >Безопасность и производительность</a><a href="troubleshooting.html" >Решение проблем</a><a href="contents.html" >Содержание</a></nav><div class="sidebar-footer"><span class="status-dot"></span>LIGHTEK RESEARCH</div></aside><button class="scrim" aria-label="Закрыть" hidden></button><main id="main"><div class="breadcrumb">HOTLINE <span>/</span> API и аддоны <span>/</span> Создание аддонов</div><article><h1>Создание аддонов: пример с пиро</h1><p><a href="../assets/examples/Pyro.rbxmx" download>Скачать готовый модуль Pyro</a> · <a href="../assets/examples/HOTLINE_Pyro_Example.zip" download>ZIP</a></p>
+<p>Разберём один законченный пример: кнопка включает и выключает игровые эффекты ParticleEmitter в папке Fire. Сначала кнопка только управляет эффектом. Затем мы добавим запись действий в HOTLINE и их воспроизведение из кью.</p>
+<p>Нужен HOTLINE 0.14.0 или новее. Это пример непрерывного эффекта Enabled=true/false, а не разового ParticleEmitter:Emit(). На его основе можно подключить собственную систему. <a href="addons.html">Об установке готовых аддонов</a>.</p>
+<h2 id="section-1">1. Подготовьте эффект и кнопку</h2>
+<ol><li>В Workspace создайте папку Fire.</li><li>Поместите в неё ваши Part/Attachment с настроенными ParticleEmitter. Аддон ищет все эмиттеры внутри папки, включая вложенные объекты.</li><li>Изначально выключите у них Enabled. Проверьте вручную, что при включении эмиттер виден: текстура, Rate и остальные параметры должны быть настроены.</li><li>В Workspace создайте Part PyroButton, а внутри него — ClickDetector.</li></ol>
+<p>Должны получиться пути Workspace.Fire и Workspace.PyroButton.ClickDetector. При тестировании в Studio левый клик будет включать эффект, правый — выключать. Кнопка должна быть в пределах MaxActivationDistance ClickDetector.</p>
+<h2 id="section-2">2. Как обычная кнопка работает без записи</h2>
+<p>До подключения HOTLINE серверный Script внутри PyroButton мог выглядеть так:</p>
+<pre><code>local folder = workspace:WaitForChild(&quot;Fire&quot;)
+local click = script.Parent:WaitForChild(&quot;ClickDetector&quot;)
 
-local enabled = false
-local System = {Changed = changed.Event}
+click.MouseClick:Connect(function()
+    for _, object in ipairs(folder:GetDescendants()) do
+        if object:IsA(&quot;ParticleEmitter&quot;) then object.Enabled = true end
+    end
+end)
 
-function System:SetEnabled(value)
-    assert(type(value) == &quot;boolean&quot;, &quot;Expected boolean&quot;)
-    if enabled == value then return end
-    enabled = value
-    print(&quot;ExampleSystem enabled:&quot;, enabled)
-    changed:Fire(enabled)
+click.RightMouseClick:Connect(function()
+    for _, object in ipairs(folder:GetDescendants()) do
+        if object:IsA(&quot;ParticleEmitter&quot;) then object.Enabled = false end
+    end
+end)</code></pre>
+<p>Этот код только включает и выключает эффект. HOTLINE пока не знает, какую кнопку нажали. Дальше перенесём управление кнопкой в ModuleScript-аддон; старый Script нужно отключить или удалить, иначе он продолжит выполнять действия отдельно от аддона.</p>
+<p>Фрагменты ниже объясняют устройство. Для установки достаточно полного модуля в разделе 6 — не нужно создавать отдельный Script для каждого фрагмента.</p>
+<h2 id="section-3">3. Вынесите действия в функции</h2>
+<p>Нам нужны две функции, которые можно вызвать как от кнопки, так и при воспроизведении. api.Folder — ссылка на папку Fire, которую передаст Resolve.</p>
+<pre><code>local function turnOn(api)
+    for _, object in ipairs(api.Folder:GetDescendants()) do
+        if object:IsA(&quot;ParticleEmitter&quot;) then object.Enabled = true end
+    end
 end
 
-function System:GetEnabled()
-    return enabled
-end
+local function turnOff(api)
+    for _, object in ipairs(api.Folder:GetDescendants()) do
+        if object:IsA(&quot;ParticleEmitter&quot;) then object.Enabled = false end
+    end
+end</code></pre>
+<p>Записывать нужно действие «включить пиро» один раз, а не отдельное изменение каждого эмиттера. Поэтому emit вызывается после функции, а не внутри цикла.</p>
+<h2 id="section-4">4. Сообщите HOTLINE о нажатии</h2>
+<p>В Connect загрузчик передаст функцию emit. После выполнения действия вызываем emit(&quot;On&quot;) или emit(&quot;Off&quot;). Во время Timed HOTLINE сохранит время команды; в Capture первая команда завершит запись.</p>
+<pre><code>api.Click.MouseClick:Connect(function(player)
+    if not canUse(player) then return end
+    turnOn(api)
+    emit(&quot;On&quot;)
+end)
 
-return System</code></pre>
-<p>Пока система только печатает состояние в Output. В реальном продукте SetEnabled управляет прибором, а Changed сообщает об изменении. Методы этой учебной системы вызываются через двоеточие.</p>
-<h2 id="section-3">Шаг 2. Полный аддон</h2>
-<p>Создайте ModuleScript Example внутри ServerScriptService.Hotline.Addons. Вставьте весь код:</p>
-<pre><code>local Addon = {
-    Id = &quot;Example&quot;,
-    Version = 1,
-    Enabled = true,
-    Commands = {},
-}
-
-Addon.Commands.SetEnabled = {
+api.Click.RightMouseClick:Connect(function(player)
+    if not canUse(player) then return end
+    turnOff(api)
+    emit(&quot;Off&quot;)
+end)</code></pre>
+<p>canUse в полном коде использует whitelist HOTLINE. Он проверяет игрока до включения эффекта. Если запись выключена, разрешённая кнопка всё равно управляет пиро, но новые события в кью не добавляются.</p>
+<h2 id="section-5">5. Подключите воспроизведение</h2>
+<p>Название в emit должно совпадать с ключом Commands. При встрече @Pyro / On HOTLINE проверит отсутствие аргументов и вызовет turnOn. Для Off — turnOff.</p>
+<pre><code>Addon.Commands.On = {
+    Validate = noArguments,
+    Run = turnOn,
     ReplayOnSeek = true,
-    Validate = function(args)
-        assert(args.n == 1 and type(args[1]) == &quot;boolean&quot;,
-            &quot;Example.SetEnabled expects one boolean&quot;)
-    end,
-    Run = function(api, value)
-        api:SetEnabled(value)
-    end,
+}
+Addon.Commands.Off = {
+    Validate = noArguments,
+    Run = turnOff,
+    ReplayOnSeek = true,
+}</code></pre>
+<p>ReplayOnSeek=true здесь подходит, потому что Enabled — состояние, которое нужно восстановить при перемотке. Для разового залпа через Emit или другой одноразовой команды обычно оставляют false. Это не второй пример: такая команда требует отдельной реализации API вашей системы.</p>
+<h2 id="section-6">6. Полный код аддона</h2>
+<p>Остановите Play. В ServerScriptService → Hotline → Addons создайте ModuleScript с именем Pyro. Вставьте весь код ниже. Исходный Script кнопки из раздела 2 должен быть отключён.</p>
+<pre><code>-- HOTLINE 0.14.0+: continuous ParticleEmitter on/off example.
+-- Install this ModuleScript as Hotline.Addons.Pyro.
+local Addon = {Id = &quot;Pyro&quot;, Version = 1, Enabled = true, Commands = {}}
+
+local function turnOn(api)
+    for _, object in ipairs(api.Folder:GetDescendants()) do
+        if object:IsA(&quot;ParticleEmitter&quot;) then object.Enabled = true end
+    end
+end
+
+local function turnOff(api)
+    for _, object in ipairs(api.Folder:GetDescendants()) do
+        if object:IsA(&quot;ParticleEmitter&quot;) then object.Enabled = false end
+    end
+end
+
+local function noArguments(args)
+    assert(args.n == 0, &quot;Pyro On/Off do not accept arguments&quot;)
+end
+
+Addon.Commands.On = {
+    Validate = noArguments,
+    Run = turnOn,
+    ReplayOnSeek = true,
+}
+Addon.Commands.Off = {
+    Validate = noArguments,
+    Run = turnOff,
+    ReplayOnSeek = true,
 }
 
 function Addon.Resolve(context)
-    return context.RequireApi(&quot;ServerScriptService.ExampleSystem&quot;)
+    local folder = context.Resolve(context.Options.FolderPath or &quot;Workspace.Fire&quot;)
+    local button = context.Resolve(context.Options.ButtonPath or &quot;Workspace.PyroButton&quot;)
+    if not folder or not button then return nil end
+    local click = button:FindFirstChildOfClass(&quot;ClickDetector&quot;)
+    assert(click, &quot;PyroButton needs a ClickDetector&quot;)
+    return {Folder = folder, Click = click}
 end
 
-function Addon.Connect(api, emit)
-    assert(api.Changed and type(api.SetEnabled) == &quot;function&quot;,
-        &quot;ExampleSystem API is incompatible&quot;)
+function Addon.Connect(api, emit, context)
+    local scripts = context.Root.Scripts
+    local settings = require(scripts.SecuritySettings)
+    local canUse = require(scripts.AccessPolicy).new(context.Config, settings)
+
     return {
-        api.Changed:Connect(function(value)
-            emit(&quot;SetEnabled&quot;, value)
+        api.Click.MouseClick:Connect(function(player)
+            if not canUse(player) then return end
+            turnOn(api)
+            emit(&quot;On&quot;)
+        end),
+        api.Click.RightMouseClick:Connect(function(player)
+            if not canUse(player) then return end
+            turnOff(api)
+            emit(&quot;Off&quot;)
         end),
     }
 end
 
 function Addon.Reset(api)
-    api:SetEnabled(false)
-end
-
-function Addon.Snapshot(api, emit)
-    emit(&quot;SetEnabled&quot;, api:GetEnabled())
+    turnOff(api)
 end
 
 return Addon</code></pre>
-<p>Цель событий этого аддона — @Example. Строка SetEnabled в emit должна точно совпадать с ключом в Commands. Id определяет цель и ключ настроек, а имя ModuleScript — строку в GetAddons. В примере оба имени одинаковые, чтобы не путаться.</p>
-<h2 id="section-4">Шаг 3. Тестовая последовательность</h2>
-<p>В ServerStorage создайте обычный Script ExampleTest и отключите его: Enabled=false. Вставьте:</p>
-<pre><code>local Api = require(game.ServerScriptService.Hotline.Scripts.Api)
-assert(Api.WaitForReady(20), &quot;HOTLINE is not ready&quot;)
-
-local deadline = os.clock() + 15
-while true do
-    local addons, err = Api.GetAddons()
-    assert(addons, err)
-    local status = addons.Example
-    if status and status.state == &quot;ready&quot; then break end
-    if status and status.state ~= &quot;loading&quot; then
-        error(&quot;Example addon: &quot; .. status.state .. &quot; / &quot; .. tostring(status.error))
-    end
-    assert(os.clock() &lt; deadline, &quot;Example addon is not ready&quot;)
-    task.wait(0.1)
-end
-
-local System = require(game.ServerScriptService.ExampleSystem)
-System:SetEnabled(true)
-task.wait(2)
-System:SetEnabled(false)</code></pre>
-<p>Перезапустите Play после добавления модулей. В HOTLINE создайте кью, выберите Timed и нажмите Record. В серверной Command Bar запустите копию теста:</p>
-<pre><code>local test = game.ServerStorage.ExampleTest:Clone()
-test.Enabled = false
-test.Parent = game.ServerScriptService
-test.Enabled = true</code></pre>
-<p>Через две секунды нажмите Pause в HOTLINE. В Events должны быть две команды @Example / SetEnabled: true, затем false примерно через 2 секунды. Сохраните и воспроизведите шоу — Output повторит изменения. При сбросе могут появляться дополнительные сообщения о выключении: Reset тоже управляет системой.</p>
-<p>Для Capture сбросьте систему в false, нажмите Record в Capture и выполните включение: первая команда запишется на смещении 0. Второе действие уже не попадёт в завершившуюся запись.</p>
-<h2 id="section-5">Шаг 4. Начальное состояние и настройки</h2>
-<p>Чтобы перед Timed записывать текущее состояние, добавьте в существующую таблицу Config:</p>
+<p>Resolve находит эффект и кнопку. Отдельный API-модуль пиро для этого простого примера не нужен: функции включения/выключения находятся прямо в аддоне. Connect подписывается на кнопку и возвращает соединения загрузчику. Reset выключает все эмиттеры при сбросе HOTLINE.</p>
+<p>Если вы используете другую систему, заменяйте turnOn/turnOff её реальными вызовами. Не вставляйте сюда core:Record или RegisterResponse из StacyPilot: в HOTLINE используются emit и Commands.</p>
+<h2 id="section-7">7. Запишите и воспроизведите</h2>
+<ol><li>Перезапустите Play после установки. Зайдите под пользователем из whitelist HOTLINE.</li><li>Создайте кью в Edit, выберите Timed и нажмите Record.</li><li>Левым кликом включите пиро. Через пару секунд правым кликом выключите.</li><li>Нажмите Pause в HOTLINE, откройте Events.</li><li>Должны появиться две команды: @Pyro / On и @Pyro / Off с разными временными смещениями.</li><li>Сохраните шоу и запустите Play. Эффект должен включиться и выключиться уже без нажатия кнопки.</li></ol>
+<p>Для Capture нажмите Record, затем один раз включите пиро. Сохранится только On на смещении 0, запись закончится. Для длительности эффекта нужны обе команды On и Off, поэтому последовательность удобнее записывать в Timed. Stop выключает эмиттеры через Reset.</p>
+<p>Повторное нажатие On тоже записывается как отдельное действие. Воспроизведение само себя не записывает: Run не нажимает кнопку и не вызывает emit.</p>
+<h2 id="section-8">Пути, статус и частые ошибки</h2>
+<p>Если имена отличаются, дополните существующую таблицу Config:</p>
 <pre><code>AddonOptions = {
-    Example = {
-        SnapshotOnRecord = true,
+    Pyro = {
+        FolderPath = &quot;Workspace.Fire&quot;,
+        ButtonPath = &quot;Workspace.PyroButton&quot;,
     },
 },</code></pre>
-<p>Snapshot сам по себе не включает систему: он вызывает emit с текущим значением. HOTLINE вызывает его только для Timed при включённой настройке. Для Capture снимок не создаётся. Если AddonOptions уже есть, добавьте Example внутрь него.</p>
-<p>Можно сделать путь настраиваемым. Тогда замените Resolve на:</p>
-<pre><code>function Addon.Resolve(context)
-    return context.RequireApi(context.Options.ApiPath
-        or &quot;ServerScriptService.ExampleSystem&quot;)
+<p>Если AddonOptions уже есть, добавьте Pyro внутрь него. После изменения путей перезапустите тест. Один Id Pyro должен использоваться только одним включённым аддоном. Выключенный PyroTemplate из базовой сборки можно оставить выключенным.</p>
+<p>Статус можно проверить из обычного серверного Script:</p>
+<pre><code>local Api = require(game.ServerScriptService.Hotline.Scripts.Api)
+assert(Api.WaitForReady(20), &quot;HOTLINE is not ready&quot;)
+local addons, err = Api.GetAddons()
+if addons then
+    local info = addons.Pyro
+    print(info and info.state, info and info.error)
+else
+    warn(err)
 end</code></pre>
-<h2 id="section-6">Контракт модуля</h2>
-<div class="tableWrapper"><table><thead><tr><th>Часть</th><th>Назначение</th></tr></thead><tbody><tr><td>Id</td><td>Уникальный идентификатор до 50 символов: первая буква, далее латинские буквы, цифры, _ или -.</td></tr><tr><td>Enabled</td><td>false отключает модуль после перезапуска.</td></tr><tr><td>Commands</td><td>Непустая таблица фиксированных команд. У каждой обязательны Validate и Run.</td></tr><tr><td>Resolve(context)</td><td>Возвращает API внешней системы или nil, если зависимость отсутствует.</td></tr><tr><td>Connect(api, emit, context)</td><td>Необязательное подключение записи; возвращает массив соединений с Disconnect.</td></tr><tr><td>Reset(api)</td><td>Необязательное безопасное восстановление/выключение при сбросе.</td></tr><tr><td>Snapshot(api, emit)</td><td>Необязательная запись текущего состояния перед Timed.</td></tr><tr><td>ReplayOnSeek</td><td>true разрешает восстановление этой команды при перемотке; по умолчанию false.</td></tr></tbody></table></div>
-<p>Connect без реализации записи может быть полезен для ручного добавления событий через Events. Если запись нужна, без emit HOTLINE не узнает о действиях.</p>
-<p>context.Config — Config HOTLINE. context.Options — Config.AddonOptions[Id] или пустая таблица. context.Root — корневая папка Hotline. context.Resolve(path) ищет Instance по пути; context.RequireApi(path) требует найденный ModuleScript или возвращает nil, если его нет.</p>
-<p>Поддерживаемые корни путей: Workspace/workspace, ServerScriptService, ServerStorage, ReplicatedStorage. Путь разбивается по точкам: для объектов с точкой в имени используйте собственный Resolve с прямым FindFirstChild. Вложенные имена с пробелами и скобками поддерживаются, если в них нет точки.</p>
-<h2 id="section-7">Аргументы и проверка</h2>
-<p>emit принимает обычные Lua/Roblox значения, не JSON и не готовые теги:</p>
-<pre><code>emit(&quot;SetEnabled&quot;, true)
--- Для команды с двумя аргументами могло бы быть:
--- emit(&quot;SetColor&quot;, &quot;Front&quot;, Color3.fromRGB(255, 0, 0))</code></pre>
-<p>Пример SetColor выше иллюстрирует формат: чтобы им пользоваться, сначала добавьте эту команду в Commands.</p>
-<p>Validate получает распакованную таблицу аргументов. Поле args.n хранит их исходное количество, включая nil. Ошибку нужно выбрасывать через assert/error: возврат false сам по себе команду не отклоняет. Run получает API и аргументы обычными параметрами.</p>
-<p>Проверяйте число аргументов, типы, имена допустимых эффектов и реальные диапазоны системы. Для чисел исключайте NaN и бесконечность. Для ссылок проверяйте, что объект относится к нужной системе. Не выбирайте произвольный метод API из пользовательской строки.</p>
-<p>Доступно до 12 аргументов: nil, boolean, конечные числа, строки, ограниченные таблицы и поддерживаемые Color3/Vector3/ColorSequence. Ограничения кодека и PayloadGuard действуют и для аддонов; строки при декодировании ограничены 4000 байтами. Произвольные Instance не поддерживаются: существующий декодер ссылок допускает Workspace BasePart. Сохранённые аргументы сериализуются общим кодеком HOTLINE.</p>
-<h2 id="section-8">Если в системе нет сигналов</h2>
-<p>Предпочтителен собственный сигнал об успешной команде. Когда есть только таблица функций, можно обернуть конкретные известные методы, как в AtomLazers:</p>
-<pre><code>function Addon.Connect(api, emit)
-    local original = api.SetEnabled
-    local wrapper = function(self, value)
-        assert(type(value) == &quot;boolean&quot;, &quot;Expected boolean&quot;)
-        original(self, value)
-        emit(&quot;SetEnabled&quot;, value)
-    end
-    api.SetEnabled = wrapper
-
-    return {{Disconnect = function()
-        if api.SetEnabled == wrapper then
-            api.SetEnabled = original
-        end
-    end}}
-end</code></pre>
-<p>Этот вариант заменяет Connect из учебного примера, а не добавляется вторым. Он рассчитан на его метод через двоеточие и отсутствие возвращаемых значений. Для другого API сохраните его способ вызова и результаты. Сначала выполните исходную функцию, затем emit: не записывайте неуспешное действие.</p>
-<p>Перехват не увидит локальную копию функции, сохранённую до установки обёртки. Клиентский API имеет отдельный контекст; серверный аддон не перехватывает клиентские действия автоматически. Для таких систем нужен доверенный серверный API/сигнал. Не оборачивайте все методы подряд и не меняйте сторонние функции, которые вам не нужны.</p>
-<h2 id="section-9">Состояние и разовые эффекты</h2>
-<p>Для SetEnabled, цвета или положения ReplayOnSeek=true обычно имеет смысл: при восстановлении позиции HOTLINE повторяет команды состояния. Reset должен привести систему к понятной начальной точке.</p>
-<p>Для разовой команды Fire, хлопушки или одноразового импульса оставьте ReplayOnSeek=false. При ручной перемотке такой эффект пропускается. При обычном прохождении времени команда выполняется; запуск с нуля исполняет команды на нуле. Это правило не запрещает повтор эффекта при новом запуске шоу. Если повтор опасен для логики вашей игры, проверяйте условия в реальном API.</p>
-<p>Не запускайте эффекты из Resolve/Connect. Они подключают интеграцию, а не воспроизводят шоу. Не создавайте снимок, который сам активирует разовый эффект.</p>
-<h2 id="section-10">Надёжность и проверка перед выпуском</h2>
-<p>Инициализация аддона имеет 10-секундный предел регистрации. Не используйте бесконечные WaitForChild в Resolve/Connect. Если зависимость отсутствует, верните nil и перезапустите тест после её установки. Готовность HOTLINE и готовность аддона проверяются отдельно.</p>
-<p>Validate, Run, Reset и обработчики сигналов делайте короткими и без ожиданий. Общие лимиты событий, очереди и бюджета команд действуют и для аддонов. HOTLINE подавляет обратную запись во время собственного dispatch/reset; не отправляйте отложенный emit через task.delay от команды воспроизведения — такое эхо выйдет за пределы подавления.</p>
-<ol><li>Проверьте прямое управление своей системой без HOTLINE.</li><li>Убедитесь, что GetAddons сообщает ready и Output не содержит ошибок.</li><li>Запишите Timed и Capture, проверьте время и аргументы в Events.</li><li>Сохраните, загрузите и воспроизведите шоу; число событий не должно расти от воспроизведения.</li><li>Проверьте Stop, перемотку, повторный запуск и Snapshot, если он есть.</li><li>Проверьте отсутствие зависимости, неверные аргументы и неправильный API.</li><li>Проверьте реальную игру с несколькими игроками: стенд с заглушками не проверяет репликацию и физику приборов.</li></ol>
-<p>Модули Addons исполняются на сервере и считаются доверенным кодом. Не загружайте аддоны из произвольных клиентских данных и не добавляйте общий RemoteEvent «выполнить любой метод».</p></article><nav class="pager"><a href="addons.html"><small>Назад</small>Аддоны</a><a href="security-performance.html"><small>Далее</small>Безопасность<span aria-hidden="true">→</span></a></nav><footer>HOTLINE · LIGHTEK RESEARCH <a href="https://t.me/hoomlion">@hoomlion ↗</a></footer></main><aside class="toc"><div class="nav-label">На этой странице</div><a class="h2" href="#section-1">Как устроена связь</a><a class="h2" href="#section-2">Шаг 1. Учебная система</a><a class="h2" href="#section-3">Шаг 2. Полный аддон</a><a class="h2" href="#section-4">Шаг 3. Тестовая последовательность</a><a class="h2" href="#section-5">Шаг 4. Начальное состояние и настройки</a><a class="h2" href="#section-6">Контракт модуля</a><a class="h2" href="#section-7">Аргументы и проверка</a><a class="h2" href="#section-8">Если в системе нет сигналов</a><a class="h2" href="#section-9">Состояние и разовые эффекты</a><a class="h2" href="#section-10">Надёжность и проверка перед выпуском</a></aside></div>
+<p>Аддон должен перейти в ready. Сразу после старта возможен loading: WaitForReady ждёт сервер HOTLINE, а не все аддоны. missing означает отсутствие папки/кнопки; failed — ошибку подключения, например отсутствующий ClickDetector. <a href="addons.html#addon-status">Все статусы</a>.</p>
+<div class="tableWrapper"><table><thead><tr><th>Проблема</th><th>Что проверить</th></tr></thead><tbody><tr><td>Кнопка не действует</td><td>Whitelist, расстояние до кнопки, ClickDetector, серверные ошибки, статус ready.</td></tr><tr><td>Эмиттеры включены, но эффекта не видно</td><td>Настройки ParticleEmitter, Texture/Rate и исходный эффект без HOTLINE.</td></tr><tr><td>Эффект работает, события не появляются</td><td>Кью выбрана, режим Edit, запись активна; старый Script кнопки отключён.</td></tr><tr><td>Команда появляется много раз</td><td>В цикле не должно быть emit; не устанавливайте две копии модуля/обработчиков.</td></tr><tr><td>После Capture пиро остаётся включённым</td><td>Capture записывает только первое действие. Запишите On и Off в Timed или нажмите Stop.</td></tr></tbody></table></div>
+<h2 id="section-9">Что менять для своего аддона</h2>
+<p>Id задаёт цель @Pyro и ключ Config.AddonOptions.Pyro. Commands перечисляет разрешённые команды. Validate получает распакованные аргументы с полем n и должен выбрасывать assert/error при неверных данных. Run получает результат Resolve и аргументы. Connect отвечает за запись; Reset — за сброс.</p>
+<p>Для этого примера аргументов нет, поэтому проверяется args.n==0. Для другой системы проверяйте число, тип и диапазон каждого аргумента. Кодек HOTLINE поддерживает до 12 аргументов; действуют общие лимиты значений и событий.</p>
+<p>Модули аддонов — доверенный серверный код. Resolve/Connect только подключают систему, не запускают эффекты. Обработчики и Run должны быть короткими и без ожиданий. Перед выпуском проверьте запись Timed/Capture, сохранение, загрузку, Stop, перемотку и отсутствие доступа у игрока вне whitelist.</p></article><nav class="pager"><a href="addons.html"><small>Назад</small>Аддоны</a><a href="security-performance.html"><small>Далее</small>Безопасность<span aria-hidden="true">→</span></a></nav><footer>HOTLINE · LIGHTEK RESEARCH <a href="https://t.me/hoomlion">@hoomlion ↗</a></footer></main><aside class="toc"><div class="nav-label">На этой странице</div><a class="h2" href="#section-1">1. Подготовьте эффект и кнопку</a><a class="h2" href="#section-2">2. Как обычная кнопка работает без записи</a><a class="h2" href="#section-3">3. Вынесите действия в функции</a><a class="h2" href="#section-4">4. Сообщите HOTLINE о нажатии</a><a class="h2" href="#section-5">5. Подключите воспроизведение</a><a class="h2" href="#section-6">6. Полный код аддона</a><a class="h2" href="#section-7">7. Запишите и воспроизведите</a><a class="h2" href="#section-8">Пути, статус и частые ошибки</a><a class="h2" href="#section-9">Что менять для своего аддона</a></aside></div>
 <dialog class="search-dialog"><div class="search-heading"><label for="query">Поиск по документации</label><button class="close-search" aria-label="Закрыть">×</button></div><input id="query" type="search" placeholder="Поиск по документации…" autocomplete="off"><div class="results"></div></dialog><dialog class="image-dialog"><button class="close-image" aria-label="Закрыть">×</button><img alt=""><a target="_blank" rel="noopener">Открыть изображение в полном размере ↗</a></dialog><script>window.WIKI_LANG="ru";window.WIKI_NO_RESULTS="\u041d\u0438\u0447\u0435\u0433\u043e \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u043e";</script><script src="../assets/search-data.js"></script><script src="../assets/app.js"></script></body></html>

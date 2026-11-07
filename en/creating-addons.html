@@ -1,160 +1,165 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Creating addons · HOTLINE</title><link rel="stylesheet" href="../assets/style.css"><script src="../assets/theme.js"></script></head>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Creating addons: a pyro example · HOTLINE</title><link rel="stylesheet" href="../assets/style.css"><script src="../assets/theme.js"></script></head>
 <body><a class="skip" href="#main">Skip to content</a><header><button class="menu" aria-label="Menu" aria-expanded="false">☰</button><a class="brand" href="index.html"><span class="brand-icon">H</span>HOTLINE<span class="docs-label">Documentation</span></a><button class="search-open">⌕ <span>Search documentation</span><kbd>Ctrl K</kbd></button><nav class="header-actions"><a href="../ru/creating-addons.html" lang="ru">RU</a><button class="theme" aria-label="Toggle theme / Сменить тему">◐</button></nav></header>
-<div class="layout"><aside class="sidebar"><div class="nav-label">GUIDE</div><nav><a href="index.html">HOTLINE</a><a href="getting-started.html" >Getting started</a><a href="interface-reference.html" >Buttons and interface reference</a><a href="configuration.html" >Configuration</a><a href="recording.html" >Recording cues</a><a href="timeline.html" >Timeline and Cue List</a><a href="shows.html" >Shows, saving, and playback</a><div class="nav-label api-nav-label">API &amp; ADDONS</div><a href="api-addons.html">API and automation</a><a class="nav-subpage" href="addons.html">Addons</a><a class="nav-subpage" href="creating-addons.html" aria-current="page">Creating addons</a><a href="security-performance.html" >Security and performance</a><a href="troubleshooting.html" >Troubleshooting</a><a href="contents.html" >Table of contents</a></nav><div class="sidebar-footer"><span class="status-dot"></span>LIGHTEK RESEARCH</div></aside><button class="scrim" aria-label="Close" hidden></button><main id="main"><div class="breadcrumb">HOTLINE <span>/</span> API and addons <span>/</span> Creating addons</div><article><h1>Creating addons</h1><p><a href="../assets/examples/HOTLINE_Example_Addon.zip" download>Download all three tutorial files</a>. The archive lists installation paths; the test Script is disabled.</p>
-<p>This tutorial builds a small server system with an enabled/disabled state, connects it to HOTLINE and records its commands. It is a teaching example: a real integration uses your camera, pyrotechnics, screen or other system&#x27;s actual API.</p>
-<p>Install HOTLINE 0.14.0 and verify normal GLights recording first. For ready-made integrations, see <a href="addons.html">Addons</a>.</p>
-<h2 id="section-1">How the connection works</h2>
-<p>The external system reports a change → Connect forwards a command through emit → HOTLINE stores it in a cue. During playback, HOTLINE checks arguments through Validate and calls Run. Reset handles resetting state.</p>
-<p>The addon does not replace your system&#x27;s API or implement a new timeline. It declares a fixed command set and connects notifications about actions.</p>
-<h2 id="section-2">Step 1. A teaching system</h2>
-<p>Create a ModuleScript named ExampleSystem directly in ServerScriptService:</p>
-<pre><code>local changed = Instance.new(&quot;BindableEvent&quot;)
-changed.Name = &quot;Changed&quot;
-changed.Parent = script
+<div class="layout"><aside class="sidebar"><div class="nav-label">GUIDE</div><nav><a href="index.html">HOTLINE</a><a href="getting-started.html" >Getting started</a><a href="interface-reference.html" >Buttons and interface reference</a><a href="configuration.html" >Configuration</a><a href="recording.html" >Recording cues</a><a href="timeline.html" >Timeline and Cue List</a><a href="shows.html" >Shows, saving, and playback</a><div class="nav-label api-nav-label">API &amp; ADDONS</div><a href="api-addons.html">API and automation</a><a class="nav-subpage" href="addons.html">Addons</a><a class="nav-subpage" href="creating-addons.html" aria-current="page">Creating addons</a><a href="security-performance.html" >Security and performance</a><a href="troubleshooting.html" >Troubleshooting</a><a href="contents.html" >Table of contents</a></nav><div class="sidebar-footer"><span class="status-dot"></span>LIGHTEK RESEARCH</div></aside><button class="scrim" aria-label="Close" hidden></button><main id="main"><div class="breadcrumb">HOTLINE <span>/</span> API and addons <span>/</span> Creating addons</div><article><h1>Creating addons: a pyro example</h1><p><a href="../assets/examples/Pyro.rbxmx" download>Download the complete Pyro module</a> · <a href="../assets/examples/HOTLINE_Pyro_Example.zip" download>ZIP</a></p>
+<p>This guide follows one complete example: a button enables/disables ParticleEmitter effects inside a Fire folder. First the button only controls the effect. Then we add HOTLINE recording and playback from cues.</p>
+<p>Requires HOTLINE 0.14.0 or later. This is a continuous Enabled=true/false effect, not a one-shot ParticleEmitter:Emit() burst. Adapt it to your own system. See <a href="addons.html">installing ready-made addons</a>.</p>
+<h2 id="section-1">1. Prepare the effect and button</h2>
+<ol><li>Create a Fire folder in Workspace.</li><li>Place your configured Part/Attachment objects with ParticleEmitter effects inside it. The addon finds all emitters, including nested descendants.</li><li>Disable their Enabled property initially. Verify that enabling them manually produces a visible effect: configure Texture, Rate and other properties first.</li><li>Create a Part named PyroButton in Workspace and add a ClickDetector inside it.</li></ol>
+<p>The paths should be Workspace.Fire and Workspace.PyroButton.ClickDetector. In Studio testing, left-click enables the effect and right-click disables it. Stay within the ClickDetector&#x27;s MaxActivationDistance.</p>
+<h2 id="section-2">2. A normal button without recording</h2>
+<p>Before HOTLINE integration, a server Script inside PyroButton might look like this:</p>
+<pre><code>local folder = workspace:WaitForChild(&quot;Fire&quot;)
+local click = script.Parent:WaitForChild(&quot;ClickDetector&quot;)
 
-local enabled = false
-local System = {Changed = changed.Event}
+click.MouseClick:Connect(function()
+    for _, object in ipairs(folder:GetDescendants()) do
+        if object:IsA(&quot;ParticleEmitter&quot;) then object.Enabled = true end
+    end
+end)
 
-function System:SetEnabled(value)
-    assert(type(value) == &quot;boolean&quot;, &quot;Expected boolean&quot;)
-    if enabled == value then return end
-    enabled = value
-    print(&quot;ExampleSystem enabled:&quot;, enabled)
-    changed:Fire(enabled)
+click.RightMouseClick:Connect(function()
+    for _, object in ipairs(folder:GetDescendants()) do
+        if object:IsA(&quot;ParticleEmitter&quot;) then object.Enabled = false end
+    end
+end)</code></pre>
+<p>This only controls the effect. HOTLINE does not know which button was pressed. We will move button handling into an addon ModuleScript; disable/remove the old button Script so it cannot continue acting separately.</p>
+<p>The snippets below explain the parts. To install the example, use the complete module in section 6. Do not create a separate Script for every snippet.</p>
+<h2 id="section-3">3. Move actions into functions</h2>
+<p>Use two functions callable both by the button and by playback. api.Folder is the Fire folder reference returned by Resolve.</p>
+<pre><code>local function turnOn(api)
+    for _, object in ipairs(api.Folder:GetDescendants()) do
+        if object:IsA(&quot;ParticleEmitter&quot;) then object.Enabled = true end
+    end
 end
 
-function System:GetEnabled()
-    return enabled
-end
+local function turnOff(api)
+    for _, object in ipairs(api.Folder:GetDescendants()) do
+        if object:IsA(&quot;ParticleEmitter&quot;) then object.Enabled = false end
+    end
+end</code></pre>
+<p>Record the action “enable pyro” once, not each emitter&#x27;s individual property change. Call emit after the action, outside the loop.</p>
+<h2 id="section-4">4. Record the button action</h2>
+<p>The loader passes emit to Connect. Call emit(&quot;On&quot;) or emit(&quot;Off&quot;) after the action succeeds. Timed retains the command&#x27;s offset; the first command in Capture ends recording.</p>
+<pre><code>api.Click.MouseClick:Connect(function(player)
+    if not canUse(player) then return end
+    turnOn(api)
+    emit(&quot;On&quot;)
+end)
 
-return System</code></pre>
-<p>This system only prints state to Output. In a real product, SetEnabled controls a device and Changed reports the change. This teaching API uses colon calls.</p>
-<h2 id="section-3">Step 2. The complete addon</h2>
-<p>Create a ModuleScript named Example inside ServerScriptService.Hotline.Addons and paste the full code:</p>
-<pre><code>local Addon = {
-    Id = &quot;Example&quot;,
-    Version = 1,
-    Enabled = true,
-    Commands = {},
-}
-
-Addon.Commands.SetEnabled = {
+api.Click.RightMouseClick:Connect(function(player)
+    if not canUse(player) then return end
+    turnOff(api)
+    emit(&quot;Off&quot;)
+end)</code></pre>
+<p>In the full module, canUse checks the HOTLINE whitelist before enabling the effect. Without active recording, an authorized button still controls pyro but adds no cue events.</p>
+<h2 id="section-5">5. Add playback</h2>
+<p>The emit name must match its Commands key. When HOTLINE encounters @Pyro / On, it validates that there are no arguments and calls turnOn. Off calls turnOff.</p>
+<pre><code>Addon.Commands.On = {
+    Validate = noArguments,
+    Run = turnOn,
     ReplayOnSeek = true,
-    Validate = function(args)
-        assert(args.n == 1 and type(args[1]) == &quot;boolean&quot;,
-            &quot;Example.SetEnabled expects one boolean&quot;)
-    end,
-    Run = function(api, value)
-        api:SetEnabled(value)
-    end,
+}
+Addon.Commands.Off = {
+    Validate = noArguments,
+    Run = turnOff,
+    ReplayOnSeek = true,
+}</code></pre>
+<p>ReplayOnSeek=true is appropriate here because Enabled is state that seeking should restore. A one-shot Emit burst or pulse usually keeps it false. That requires a separate implementation for your system; it is not part of this continuous-effect example.</p>
+<h2 id="section-6">6. Complete addon code</h2>
+<p>Stop Play. Create a ModuleScript named Pyro in ServerScriptService → Hotline → Addons and paste the entire code below. Disable the old button Script from section 2.</p>
+<pre><code>-- HOTLINE 0.14.0+: continuous ParticleEmitter on/off example.
+-- Install this ModuleScript as Hotline.Addons.Pyro.
+local Addon = {Id = &quot;Pyro&quot;, Version = 1, Enabled = true, Commands = {}}
+
+local function turnOn(api)
+    for _, object in ipairs(api.Folder:GetDescendants()) do
+        if object:IsA(&quot;ParticleEmitter&quot;) then object.Enabled = true end
+    end
+end
+
+local function turnOff(api)
+    for _, object in ipairs(api.Folder:GetDescendants()) do
+        if object:IsA(&quot;ParticleEmitter&quot;) then object.Enabled = false end
+    end
+end
+
+local function noArguments(args)
+    assert(args.n == 0, &quot;Pyro On/Off do not accept arguments&quot;)
+end
+
+Addon.Commands.On = {
+    Validate = noArguments,
+    Run = turnOn,
+    ReplayOnSeek = true,
+}
+Addon.Commands.Off = {
+    Validate = noArguments,
+    Run = turnOff,
+    ReplayOnSeek = true,
 }
 
 function Addon.Resolve(context)
-    return context.RequireApi(&quot;ServerScriptService.ExampleSystem&quot;)
+    local folder = context.Resolve(context.Options.FolderPath or &quot;Workspace.Fire&quot;)
+    local button = context.Resolve(context.Options.ButtonPath or &quot;Workspace.PyroButton&quot;)
+    if not folder or not button then return nil end
+    local click = button:FindFirstChildOfClass(&quot;ClickDetector&quot;)
+    assert(click, &quot;PyroButton needs a ClickDetector&quot;)
+    return {Folder = folder, Click = click}
 end
 
-function Addon.Connect(api, emit)
-    assert(api.Changed and type(api.SetEnabled) == &quot;function&quot;,
-        &quot;ExampleSystem API is incompatible&quot;)
+function Addon.Connect(api, emit, context)
+    local scripts = context.Root.Scripts
+    local settings = require(scripts.SecuritySettings)
+    local canUse = require(scripts.AccessPolicy).new(context.Config, settings)
+
     return {
-        api.Changed:Connect(function(value)
-            emit(&quot;SetEnabled&quot;, value)
+        api.Click.MouseClick:Connect(function(player)
+            if not canUse(player) then return end
+            turnOn(api)
+            emit(&quot;On&quot;)
+        end),
+        api.Click.RightMouseClick:Connect(function(player)
+            if not canUse(player) then return end
+            turnOff(api)
+            emit(&quot;Off&quot;)
         end),
     }
 end
 
 function Addon.Reset(api)
-    api:SetEnabled(false)
-end
-
-function Addon.Snapshot(api, emit)
-    emit(&quot;SetEnabled&quot;, api:GetEnabled())
+    turnOff(api)
 end
 
 return Addon</code></pre>
-<p>The event target is @Example. The SetEnabled string in emit must match the Commands key exactly. Id determines the target and settings key; the ModuleScript name determines its GetAddons row. They match here to keep the example clear.</p>
-<h2 id="section-4">Step 3. A test sequence</h2>
-<p>Create an ordinary Script ExampleTest in ServerStorage and disable it with Enabled=false:</p>
-<pre><code>local Api = require(game.ServerScriptService.Hotline.Scripts.Api)
-assert(Api.WaitForReady(20), &quot;HOTLINE is not ready&quot;)
-
-local deadline = os.clock() + 15
-while true do
-    local addons, err = Api.GetAddons()
-    assert(addons, err)
-    local status = addons.Example
-    if status and status.state == &quot;ready&quot; then break end
-    if status and status.state ~= &quot;loading&quot; then
-        error(&quot;Example addon: &quot; .. status.state .. &quot; / &quot; .. tostring(status.error))
-    end
-    assert(os.clock() &lt; deadline, &quot;Example addon is not ready&quot;)
-    task.wait(0.1)
-end
-
-local System = require(game.ServerScriptService.ExampleSystem)
-System:SetEnabled(true)
-task.wait(2)
-System:SetEnabled(false)</code></pre>
-<p>Restart Play after adding the modules. Create/select a cue in HOTLINE, choose Timed and press Record. From SERVER Command Bar, launch a test copy:</p>
-<pre><code>local test = game.ServerStorage.ExampleTest:Clone()
-test.Enabled = false
-test.Parent = game.ServerScriptService
-test.Enabled = true</code></pre>
-<p>After two seconds, press Pause in HOTLINE. Events should contain two @Example / SetEnabled commands: true and false approximately two seconds apart. Save and replay the show; Output should repeat the changes. Reset can print additional disabled-state messages because it also controls the system.</p>
-<p>For Capture, reset the system to false, start Capture recording and execute the enable action. The first command is stored at offset zero; the second action occurs after that recording has already finished.</p>
-<h2 id="section-5">Step 4. Initial state and options</h2>
-<p>To record current state at the start of Timed, merge this into the existing Config table:</p>
+<p>Resolve finds the effect folder and button. No separate pyro API module is required for this simple example: the on/off functions live in the addon itself. Connect registers button handlers and returns their connections. Reset disables all emitters when HOTLINE resets.</p>
+<p>For a different system, replace turnOn/turnOff with its actual API calls. Do not paste StacyPilot&#x27;s core:Record or RegisterResponse into HOTLINE: this contract uses emit and Commands.</p>
+<h2 id="section-7">7. Record and replay</h2>
+<ol><li>Restart Play and use a player on the HOTLINE whitelist.</li><li>Create/select a cue in Edit, choose Timed and press Record.</li><li>Left-click to enable pyro; after a couple of seconds, right-click to disable it.</li><li>Press Pause in HOTLINE and open Events.</li><li>Expect two commands: @Pyro / On and @Pyro / Off at different offsets.</li><li>Save the show and press Play. The effect should enable and disable without button clicks.</li></ol>
+<p>For Capture, press Record and enable pyro once. Only On is stored at offset zero and recording finishes. To define the effect&#x27;s duration you need both On and Off, so Timed is more convenient. Stop disables emitters through Reset.</p>
+<p>Pressing On again records another action. Playback does not record itself: Run neither clicks the button nor calls emit.</p>
+<h2 id="section-8">Paths, status and troubleshooting</h2>
+<p>For different object names, merge this into the existing Config table:</p>
 <pre><code>AddonOptions = {
-    Example = {
-        SnapshotOnRecord = true,
+    Pyro = {
+        FolderPath = &quot;Workspace.Fire&quot;,
+        ButtonPath = &quot;Workspace.PyroButton&quot;,
     },
 },</code></pre>
-<p>Snapshot does not enable the system: it emits the current value. HOTLINE calls it only for Timed with SnapshotOnRecord enabled. Capture never takes an automatic snapshot. If AddonOptions exists, add Example inside it.</p>
-<p>To make the path configurable, replace Resolve with:</p>
-<pre><code>function Addon.Resolve(context)
-    return context.RequireApi(context.Options.ApiPath
-        or &quot;ServerScriptService.ExampleSystem&quot;)
+<p>If AddonOptions exists, add Pyro inside it. Restart after path changes. Only one enabled addon may use Id Pyro. Keep the base package&#x27;s PyroTemplate disabled.</p>
+<p>Check status from an ordinary server Script:</p>
+<pre><code>local Api = require(game.ServerScriptService.Hotline.Scripts.Api)
+assert(Api.WaitForReady(20), &quot;HOTLINE is not ready&quot;)
+local addons, err = Api.GetAddons()
+if addons then
+    local info = addons.Pyro
+    print(info and info.state, info and info.error)
+else
+    warn(err)
 end</code></pre>
-<h2 id="section-6">Module contract</h2>
-<div class="tableWrapper"><table><thead><tr><th>Part</th><th>Purpose</th></tr></thead><tbody><tr><td>Id</td><td>Unique identifier, up to 50 characters: a letter first, then Latin letters, digits, _ or -.</td></tr><tr><td>Enabled</td><td>False disables the module after restart.</td></tr><tr><td>Commands</td><td>Non-empty fixed command table. Every command requires Validate and Run.</td></tr><tr><td>Resolve(context)</td><td>Returns the external API or nil if the dependency is absent.</td></tr><tr><td>Connect(api, emit, context)</td><td>Optional capture setup; returns an array of connections supporting Disconnect.</td></tr><tr><td>Reset(api)</td><td>Optional safe state reset/disable action.</td></tr><tr><td>Snapshot(api, emit)</td><td>Optional initial-state capture before Timed.</td></tr><tr><td>ReplayOnSeek</td><td>True permits this command during seek restoration; default false.</td></tr></tbody></table></div>
-<p>An addon without capture setup can still support manually authored Events. If recording is required, HOTLINE needs emit to learn about actions.</p>
-<p>context.Config is HOTLINE Config. context.Options is Config.AddonOptions[Id] or an empty table. context.Root is the Hotline folder. context.Resolve(path) finds an Instance; context.RequireApi(path) requires the ModuleScript or returns nil if absent.</p>
-<p>Supported roots: Workspace/workspace, ServerScriptService, ServerStorage, ReplicatedStorage. Paths split on dots: for object names containing a dot, write your own Resolve using direct FindFirstChild. Spaces and parentheses work if names have no dots.</p>
-<h2 id="section-7">Arguments and validation</h2>
-<p>Pass normal Lua/Roblox values to emit, not JSON or pre-encoded tags:</p>
-<pre><code>emit(&quot;SetEnabled&quot;, true)
--- A two-argument command could use:
--- emit(&quot;SetColor&quot;, &quot;Front&quot;, Color3.fromRGB(255, 0, 0))</code></pre>
-<p>The SetColor comment only illustrates the format. Add that command to Commands before using it.</p>
-<p>Validate receives unpacked arguments. args.n preserves the original count, including nil. Reject with assert/error: returning false alone does not reject a command. Run receives the API followed by ordinary parameters.</p>
-<p>Validate arity, types, allowed effect names and actual system ranges. Exclude NaN/infinity for numbers. Check referenced objects belong to the intended system. Never select an arbitrary API method from a user-provided string.</p>
-<p>Up to 12 arguments are supported: nil, booleans, finite numbers, strings, bounded tables and supported Color3/Vector3/ColorSequence values. Shared codec/PayloadGuard limits apply; decoded strings are limited to 4000 bytes. Arbitrary Instances are not supported: the current reference decoder permits Workspace BasePart targets. Stored arguments use HOTLINE&#x27;s shared serializer.</p>
-<h2 id="section-8">APIs without change signals</h2>
-<p>A dedicated successful-command signal is preferable. If only a function table exists, wrap specific known methods, as AtomLazers does:</p>
-<pre><code>function Addon.Connect(api, emit)
-    local original = api.SetEnabled
-    local wrapper = function(self, value)
-        assert(type(value) == &quot;boolean&quot;, &quot;Expected boolean&quot;)
-        original(self, value)
-        emit(&quot;SetEnabled&quot;, value)
-    end
-    api.SetEnabled = wrapper
-
-    return {{Disconnect = function()
-        if api.SetEnabled == wrapper then
-            api.SetEnabled = original
-        end
-    end}}
-end</code></pre>
-<p>This replaces the tutorial&#x27;s Connect; do not define it twice. It assumes this teaching system&#x27;s colon method and no return values. Preserve the actual API&#x27;s calling convention and return values when adapting it. Call the original first, then emit: failed actions should not be recorded.</p>
-<p>A function reference cached before wrapping bypasses the wrapper. Client APIs use a separate context; a server addon does not automatically capture client actions. Such systems need a trusted server API/signal. Do not wrap unrelated methods or every method indiscriminately.</p>
-<h2 id="section-9">State versus one-shot effects</h2>
-<p>ReplayOnSeek=true often suits enabled state, color and position: HOTLINE restores these by replaying state commands. Reset should establish a meaningful baseline.</p>
-<p>Keep ReplayOnSeek=false for a Fire command, confetti burst or one-shot pulse. Manual seeking skips it. Normal timed playback executes it; starting from zero executes commands at zero. This does not prevent repeated effects on a new show run. If repetition is invalid for your game&#x27;s logic, enforce conditions in the actual API.</p>
-<p>Resolve/Connect register the integration, not perform a show. Never activate effects there. A snapshot must not itself activate a one-shot effect.</p>
-<h2 id="section-10">Reliability and release checks</h2>
-<p>Addon registration has a 10-second timeout. Avoid infinite WaitForChild in Resolve/Connect. Return nil for a missing dependency and restart after installing it. HOTLINE readiness and addon readiness are separate.</p>
-<p>Keep Validate, Run, Reset and signal handlers short and non-yielding. Shared event limits, queue limits and command budgets apply. HOTLINE suppresses recording feedback during its dispatch/reset; do not delay an emit with task.delay from a playback command, because that echo escapes the suppression window.</p>
-<ol><li>Verify direct system control without HOTLINE.</li><li>Check GetAddons reports ready and Output has no errors.</li><li>Record Timed and Capture; inspect offsets and arguments in Events.</li><li>Save, load and replay. Playback must not increase the recorded event count.</li><li>Test Stop, seeking, restarting and Snapshot if implemented.</li><li>Test missing dependencies, invalid arguments and incompatible APIs.</li><li>Test a real multiplayer session: a mocked harness cannot verify replication or fixture physics.</li></ol>
-<p>Addons execute trusted server code. Do not load them from arbitrary client input or expose a generic RemoteEvent that can execute any command.</p></article><nav class="pager"><a href="addons.html"><small>Previous</small>Addons</a><a href="security-performance.html"><small>Next</small>Security<span aria-hidden="true">→</span></a></nav><footer>HOTLINE · LIGHTEK RESEARCH <a href="https://t.me/hoomlion">@hoomlion ↗</a></footer></main><aside class="toc"><div class="nav-label">On this page</div><a class="h2" href="#section-1">How the connection works</a><a class="h2" href="#section-2">Step 1. A teaching system</a><a class="h2" href="#section-3">Step 2. The complete addon</a><a class="h2" href="#section-4">Step 3. A test sequence</a><a class="h2" href="#section-5">Step 4. Initial state and options</a><a class="h2" href="#section-6">Module contract</a><a class="h2" href="#section-7">Arguments and validation</a><a class="h2" href="#section-8">APIs without change signals</a><a class="h2" href="#section-9">State versus one-shot effects</a><a class="h2" href="#section-10">Reliability and release checks</a></aside></div>
+<p>The addon should become ready. It can initially be loading: WaitForReady waits for HOTLINE, not every addon. missing means a folder/button is absent; failed indicates a setup error such as a missing ClickDetector. See <a href="addons.html#addon-status">all statuses</a>.</p>
+<div class="tableWrapper"><table><thead><tr><th>Problem</th><th>Check</th></tr></thead><tbody><tr><td>Button does nothing</td><td>Whitelist, distance, ClickDetector, server errors and ready status.</td></tr><tr><td>Emitters are enabled but invisible</td><td>ParticleEmitter Texture/Rate and the original effect without HOTLINE.</td></tr><tr><td>Effects work but no events appear</td><td>Selected cue, Edit mode, active recording; old button Script disabled.</td></tr><tr><td>Many duplicate commands</td><td>Keep emit outside the emitter loop; avoid duplicate modules/handlers.</td></tr><tr><td>Pyro stays enabled after Capture</td><td>Capture stores only the first action. Record On and Off in Timed or press Stop.</td></tr></tbody></table></div>
+<h2 id="section-9">Adapting this to your system</h2>
+<p>Id determines @Pyro and Config.AddonOptions.Pyro. Commands lists allowed actions. Validate receives unpacked arguments with an n field and must assert/error on invalid input. Run receives the result of Resolve and command arguments. Connect captures actions; Reset restores state.</p>
+<p>This example has no arguments, so it checks args.n==0. For another system, validate each argument&#x27;s count, type and range. The shared codec supports up to 12 arguments with HOTLINE&#x27;s value/event limits.</p>
+<p>Addons are trusted server code. Resolve/Connect register the integration, not activate effects. Keep handlers and Run short and non-yielding. Before release, test Timed/Capture, save/load, Stop, seeking and denied interaction from a player outside the whitelist.</p></article><nav class="pager"><a href="addons.html"><small>Previous</small>Addons</a><a href="security-performance.html"><small>Next</small>Security<span aria-hidden="true">→</span></a></nav><footer>HOTLINE · LIGHTEK RESEARCH <a href="https://t.me/hoomlion">@hoomlion ↗</a></footer></main><aside class="toc"><div class="nav-label">On this page</div><a class="h2" href="#section-1">1. Prepare the effect and button</a><a class="h2" href="#section-2">2. A normal button without recording</a><a class="h2" href="#section-3">3. Move actions into functions</a><a class="h2" href="#section-4">4. Record the button action</a><a class="h2" href="#section-5">5. Add playback</a><a class="h2" href="#section-6">6. Complete addon code</a><a class="h2" href="#section-7">7. Record and replay</a><a class="h2" href="#section-8">Paths, status and troubleshooting</a><a class="h2" href="#section-9">Adapting this to your system</a></aside></div>
 <dialog class="search-dialog"><div class="search-heading"><label for="query">Search documentation</label><button class="close-search" aria-label="Close">×</button></div><input id="query" type="search" placeholder="Search documentation…" autocomplete="off"><div class="results"></div></dialog><dialog class="image-dialog"><button class="close-image" aria-label="Close">×</button><img alt=""><a target="_blank" rel="noopener">Open image at full size ↗</a></dialog><script>window.WIKI_LANG="en";window.WIKI_NO_RESULTS="No results";</script><script src="../assets/search-data.js"></script><script src="../assets/app.js"></script></body></html>
